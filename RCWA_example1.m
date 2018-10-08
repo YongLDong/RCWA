@@ -14,8 +14,8 @@ lam0 = 2 * centimeters; %free space wavelength
 theta = 60 * degrees;             % elevation angle
 NN = length(theta);
 phi   = 30 * degrees;             % azimuthal angle
-pte   = 1/sqrt(2);                       % amplitude of TE polarization
-ptm   = 1j/sqrt(2);                       % amplitude of TM polarization
+pte   = 1/sqrt(2);                      % amplitude of TE polarization
+ptm   = 1j/sqrt(2);                      % amplitude of TM polarization
 
 % DEVICE PARAMETERS
 ur1 = 1.0; %permeability in reflection region
@@ -103,23 +103,23 @@ for ii=1:NN
     Kx = diag(sparse(Kx(:)));
     Ky = diag(sparse(Ky(:)));
 
-    Kzr = -conj(sqrt(ur1*conj(er1)*I-Kx^2-Ky^2));
-    Kzt = conj(sqrt(ur2*conj(er2)*I-Kx^2-Ky^2));
+    Kzr = -conj(sqrte(ur1*conj(er1)*I-Kx^2-Ky^2));
+    Kzt = conj(sqrte(ur2*conj(er2)*I-Kx^2-Ky^2));
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 5: COMPUTE EIGEN MODES OF FREE SPACE
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    Kz = conj(sqrte(I));
-    Q = [Kx*Ky I+Ky^2; -(I+Kx^2) -Kx*Ky];
+%      Kz = conj(sqrt(I-Kx^2-Ky^2));
+    Q = [Kx*Ky I-Kx^2; Ky^2-I -Kx*Ky];
     W0 = [I Z; Z I];
     V0 = -1j*Q;
-    if theta(ii)== 0
-        Kz = conj(sqrt(I-Kx^2-Ky^2));
-        Q = [Kx*Ky I-Kx^2; Ky^2-I -Kx*Ky];
-        W0 = [I Z; Z I];
-        LAM = [1j*Kz Z; Z 1j*Kz];
-        V0 = Q/LAM;
-    end
+%     if theta(ii)== 0
+%         Kz = conj(sqrt(I-Kx^2-Ky^2));
+%         Q = [Kx*Ky I-Kx^2; Ky^2-I -Kx*Ky];
+%         W0 = [I Z; Z I];
+%         LAM = [1j*Kz Z; Z 1j*Kz];
+%         V0 = Q/LAM;
+%     end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 6: INITIALIZE GLOBAL SCATTERING MATRIX

@@ -4,6 +4,8 @@
 %
  clc; clear all;
 tic();
+%control value
+One_Dime='yes';
 % UNITS
 meters = 1;
 centimeters = 1e-2 * meters;
@@ -30,19 +32,21 @@ er2 = -17.42+1i*0.58; %permittivity in transmission region
 n_layers_unitcell = 2;
 n_bilayers = 1;
 urd = [1.0]; %permeability of device
+% erd = [-17.42+1i*0.58];
 erd = [-17.42+1i*0.58];
-
 d = 60 * nanometers;
 d2 = 50 * nanometers;
 
 Lx = 1000 * nanometers; %period along x
-Ly = 1000 * nanometers; %period along y
+Ly = Inf * nanometers; %period along y
 
 % RCWA PARAMETERS
-Nx = 512; %number of point along x in real-space grid
-Ny = round(Nx*Ly/Lx); %number of point along y in real-space grid
-NH= 13;%number of harmonics
-PQ = NH*[1 1]; %number of spatial harmonics along x and y
+Nx = 50000; %number of point along x in real-space grid
+%  Ny = round(Nx*Ly/Lx); %number of point along y in real-space grid
+Ny=1;
+
+NH= 51;%number of harmonics
+PQ=[NH 1];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: BUILD DEVICE LAYERS ON HIGH RESOLUTION GRID
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -93,8 +97,10 @@ L = [d d2];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 3: COMPUTE CONVOLUTION MATRICES OF EACH LAYER OF DEVICE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-URC = zeros(PQ(1)^2,PQ(2)^2,NL);
-ERC = zeros(PQ(1)^2,PQ(2)^2,NL);
+        URC = zeros(PQ(1)*PQ(2),PQ(1)*PQ(2),NL);
+        ERC = zeros(PQ(1)*PQ(2),PQ(1)*PQ(2),NL);
+
+
 for i = 1:NL
     URC(:,:,i) = convmat(UR(:,:,i),PQ(1),PQ(2));
     ERC(:,:,i) = convmat(ER(:,:,i),PQ(1),PQ(2));
@@ -109,8 +115,11 @@ for ii=1:NN
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 4: COMPUTE WAVE VECTOR EXPANSIONS
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    I = eye(PQ(1)^2,PQ(2)^2);
-    Z = zeros(PQ(1)^2,PQ(2)^2);
+
+            I = eye(PQ(1)*PQ(2),PQ(1)*PQ(2));
+            Z = zeros(PQ(1)*PQ(2),PQ(1)*PQ(2));%for 1-d periodicity
+  
+
 
     n1 = sqrt(er1);
     n2 = sqrt(er2);
@@ -129,16 +138,21 @@ for ii=1:NN
     Kx = diag(sparse(Kx(:)));
     Ky = diag(sparse(Ky(:)));
 
-    Kzr = -(sqrt(ur1*conj(er1)*I-Kx^2-Ky^2));
-    Kzt = conj(sqrt(ur2*conj(er2)*I-Kx^2-Ky^2));
+    Kzr = -conj(sqrte(ur1*conj(er1)*I-Kx^2-Ky^2));
+    Kzt = conj(sqrte(ur2*conj(er2)*I-Kx^2-Ky^2));
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 5: COMPUTE EIGEN MODES OF FREE SPACE
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-    %Kz = conj(sqrte(I));
+% %     %Kz = conj(sqrte(I));
     Q = [Kx*Ky I+Ky^2; -(I+Kx^2) -Kx*Ky];
     W0 = [I Z; Z I];
     V0 = -1j*Q;
+%         Kz = conj(sqrt(I-Kx^2-Ky^2));
+%         Q = [Kx*Ky I-Kx^2; Ky^2-I -Kx*Ky];
+%         W0 = [I Z; Z I];
+%         LAM = [1j*Kz Z; Z 1j*Kz];
+%         V0 = Q*pinv(LAM);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 6: INITIALIZE GLOBAL SCATTERING MATRIX
@@ -188,7 +202,9 @@ for ii=1:NN
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 11: COMPUTE REFLECTION AND TRANSMITTED FIELDS
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    delta = zeros(PQ(1)^2,1);
+
+            delta = zeros(PQ(1)*PQ(2),1);
+ 
     delta(ceil(length(delta)/2),1) = 1;
 
     n_hat = [0; 0; 1];
@@ -215,7 +231,8 @@ for ii=1:NN
     %%% Polarization vector
     EP = pte*a_hat_te + ptm*a_hat_tm;
 
-    esrc = zeros(2*PQ(1)^2,1);
+            esrc = zeros(2*PQ(1)*PQ(2),1);
+
     esrc(1:length(esrc)/2,1)=EP(1)*delta;
     esrc(length(esrc)/2+1:end,1)=EP(2)*delta;
 
@@ -253,7 +270,9 @@ for ii=1:NN
     Rho(ii)=r_p_matrix(ii)./r_s_matrix(ii);
     
     REF_all(ii) = sum(R);
-    REF_zero(ii) = R(floor(NH^2/2)+1);
+
+    REF_zero(ii) = R(floor(PQ(1)*PQ(2)/2)+1);
+
 
     t2 = abs(tx).^2+abs(ty).^2+abs(tz).^2;
     T = real((ur1/ur2)*Kzt/kinc(3))*t2;

@@ -3,7 +3,7 @@
 % silver grating, SPP
 % reproduce: arXiv:0706.3840v2
 
-close all; clc; clear all;
+clc; clear all;
 tic();
 %constant
 h=4.135667516*1e-15;%[eV s]
@@ -18,7 +18,7 @@ degrees = pi/180;
 % DASHBOARD
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SOURCE PARAMETERS
-lam0 = [450:50:1600] * nanometers; %free space wavelength
+lam0 = [400:5:1800] * nanometers; %free space wavelength
 Energy=h*c./lam0;
 theta = 0 * degrees;             % elevation angle
 NN = length(lam0);
@@ -33,13 +33,13 @@ for ii=1:NN
 ur1 = 1.0; %permeability in reflection region
 er1 = 1.0; %permittivity in reflection region
 ur2 = 1.0; %permeability in transmission region
-er2 = nAgw(lam0(ii)/nanometers)^2; %permittivity in transmission region
+er2 = nAg_Model_w(lam0(ii)/nanometers)^2; %permittivity in transmission region
 
 n_layers_unitcell = 1;
 n_bilayers = 1;
 
 urd =[1.0 1.0 1.0]; %permeability of device
-erd =[nAgw(lam0(ii)/nanometers)^2, nSiO2w(lam0(ii)/nanometers)^2];
+erd =[nAg_Model_w(lam0(ii)/nanometers)^2, nSiO2w(lam0(ii)/nanometers)^2];
 % ds = 10.15 * nanometers;
 % d1 = 52.53 * nanometers;
 % d2 = 300 * nanometers;
@@ -48,12 +48,15 @@ dd = 50 * nanometers;
 %df = 120 * nanometers;
 
 Lx = 400 * nanometers; %period along x
-Ly = 400 * nanometers; %period along y
+Ly = Inf * nanometers; %period along y
 
 % RCWA PARAMETERS
-Nx = 512; %number of point along x in real-space grid
-Ny = round(Nx*Ly/Lx); %number of point along y in real-space grid
-PQ = 21*[1 1]; %number of spatial harmonics along x and y
+Nx = 20000000; %number of point along x in real-space grid
+% Ny = round(Nx*Ly/Lx); %number of point along y in real-space grid
+Ny= 1;
+
+NH=61;
+PQ = [NH 1]; %number of spatial harmonics along x and y
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 2: BUILD DEVICE LAYERS ON HIGH RESOLUTION GRID
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -67,7 +70,7 @@ UR(1:Nx,1:Ny,2) = urd(2);% zeros(Nx,Ny,NL);
 ER(1:Nx,1:Ny,2) = erd(2);% zeros(Nx,Ny,NL);
 
 
- w = 200/400; %length of one side of triangle
+w = 40/400; %length of one side of triangle
 % g_height= 70 * nanometers;
 % % %grating vector along x
 f = 1;
@@ -107,8 +110,10 @@ L = [dg dd];
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STEP 3: COMPUTE CONVOLUTION MATRICES OF EACH LAYER OF DEVICE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-URC = zeros(PQ(1)^2,PQ(2)^2,NL);
-ERC = zeros(PQ(1)^2,PQ(2)^2,NL);
+URC = zeros(PQ(1)*PQ(2),PQ(1)*PQ(2),NL);
+ERC = zeros(PQ(1)*PQ(2),PQ(1)*PQ(2),NL);
+% URC = zeros(PQ(1),PQ(1),NL);
+% ERC = zeros(PQ(1),PQ(1),NL);
 for i = 1:NL
     URC(:,:,i) = convmat(UR(:,:,i),PQ(1),PQ(2));
     ERC(:,:,i) = convmat(ER(:,:,i),PQ(1),PQ(2));
@@ -122,11 +127,14 @@ end
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 4: COMPUTE WAVE VECTOR EXPANSIONS
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    I = eye(PQ(1)^2,PQ(2)^2);
-    Z = zeros(PQ(1)^2,PQ(2)^2);
+    I = eye(PQ(1)*PQ(2),PQ(1)*PQ(2));
+    Z = zeros(PQ(1)*PQ(2),PQ(1)*PQ(2));
+%     I = eye(PQ(1),PQ(1));
+%     Z = zeros(PQ(1),PQ(1));
 
-    n1 = sqrt(er1);
-    n2 = sqrt(er2);
+
+    n1 = sqrte(er1);
+    n2 = sqrte(er2);
     k0 = 2*pi/lam0(ii);
     kinc =  n1*[sin(theta)*cos(phi); sin(theta)*sin(phi); cos(theta)];
 
@@ -141,9 +149,9 @@ end
 
     Kx = diag(sparse(Kx(:)));
     Ky = diag(sparse(Ky(:)));
-
-    Kzr = -conj(sqrt(ur1*conj(er1)*I-Kx^2-Ky^2));
-    Kzt = conj(sqrt(ur2*conj(er2)*I-Kx^2-Ky^2));
+    
+    Kzr = -conj(sqrte(ur1*conj(er1)*I-Kx^2-Ky^2));
+    Kzt = conj(sqrte(ur2*conj(er2)*I-Kx^2-Ky^2));    
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 5: COMPUTE EIGEN MODES OF FREE SPACE
@@ -152,13 +160,13 @@ end
     Q = [Kx*Ky I+Ky^2; -(I+Kx^2) -Kx*Ky];
     W0 = [I Z; Z I];
     V0 = -1j*Q;
-    if theta == 0
-        Kz = conj(sqrt(I-Kx^2-Ky^2));
-        Q = [Kx*Ky I-Kx^2; Ky^2-I -Kx*Ky];
-        W0 = [I Z; Z I];
-        LAM = [1j*Kz Z; Z 1j*Kz];
-        V0 = Q/LAM;
-    end
+%     if theta == 0
+%         Kz = conj(sqrt(I-Kx^2-Ky^2));
+%         Q = [Kx*Ky I-Kx^2; Ky^2-I -Kx*Ky];
+%         W0 = [I Z; Z I];
+%         LAM = [1j*Kz Z; Z 1j*Kz];
+%         V0 = Q/LAM;
+%     end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 6: INITIALIZE GLOBAL SCATTERING MATRIX
@@ -208,10 +216,11 @@ end
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 11: COMPUTE REFLECTION AND TRANSMITTED FIELDS
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    delta = zeros(PQ(1)^2,1);
+    delta = zeros(PQ(1)*PQ(2),1);
+%     delta = zeros(PQ(1),1);
     delta(ceil(length(delta)/2),1) = 1;
 
-    n_hat = [0; 0; 1];
+    n_hat = [0; 0; -1];
     %%% cross product of k_inc and n_hat : k_inc x n_hat
     [k_inc_cross_n_hat, mag_k_inc_cross_n_hat] = vector_cross_product(kinc/k0,n_hat);
 
@@ -235,7 +244,8 @@ end
     %%% Polarization vector
     EP = pte*a_hat_te + ptm*a_hat_tm;
 
-    esrc = zeros(2*PQ(1)^2,1);
+     esrc = zeros(2*PQ(1)*PQ(2),1);
+%     esrc = zeros(2*PQ(1),1);
     esrc(1:length(esrc)/2,1)=EP(1)*delta;
     esrc(length(esrc)/2+1:end,1)=EP(2)*delta;
 
@@ -249,18 +259,19 @@ end
 
     rx = eref(1:length(eref)/2);
     ry = eref(length(eref)/2+1:end);
-    rz = -Kzr\(Kx*rx+Ky*ry);
+%     rz = -Kzr\(Kx*rx+Ky*ry);
+    rz = -pinv(Kzr)*(Kx*rx+Ky*ry);
 
     tx = etrn(1:length(etrn)/2);
     ty = etrn(length(etrn)/2+1:end);
-    tz = -Kzt\(Kx*tx+Ky*ty);
+%     tz = -Kzt\(Kx*tx+Ky*ty);
+    tz = -pinv(Kzt)*(Kx*tx+Ky*ty);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % STEP 12: COMPUTE DIFFRACTION EFFICIENCIES
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     r2 = abs(rx).^2+abs(ry).^2+abs(rz).^2;
     R = real(-Kzr/kinc(3))*r2;
-    
 
     r_s=real(Kzr/kinc(3))*(ry);
     r_s_matrix(ii)=sum(r_s);
@@ -275,6 +286,7 @@ end
     Rho(ii)=r_p_matrix(ii)./r_s_matrix(ii);
     
     REF(ii) = sum(R);
+    REF_zero(ii) = R(floor(PQ(1)*PQ(2)/2)+1);
 
     t2 = abs(tx).^2+abs(ty).^2+abs(tz).^2;
     T = real((ur1/ur2)*Kzt/kinc(3))*t2;
